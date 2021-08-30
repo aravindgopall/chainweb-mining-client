@@ -471,10 +471,11 @@ getInfo conf mgr = getJson mgr req
 --
 getNodeVersion :: Config -> HTTP.Manager -> IO ChainwebVersion
 getNodeVersion conf mgr = do
-    i <- getInfo conf mgr
-    case HM.lookup "nodeVersion" i of
-        Just (String x) -> return $ ChainwebVersion x
-        _ -> error "failed to parse chainweb version from node info"
+  return $ ChainwebVersion "development"
+    --i <- getInfo conf mgr
+    --case HM.lookup "nodeVersion" i of
+        --Just (String x) -> return $ ChainwebVersion x
+        --_ -> error "failed to parse chainweb version from node info"
 
 -- | Get new work from the chainweb node (for some available chain)
 --
@@ -482,6 +483,7 @@ getNodeVersion conf mgr = do
 --
 getJob :: Config -> ChainwebVersion -> HTTP.Manager -> IO (ChainId, Target, Work)
 getJob conf ver mgr = do
+    print req
     bytes <- HTTP.httpLbs req mgr
     case runGetS decodeJob (BL.toStrict $ HTTP.responseBody $ bytes) of
         Left e -> error $ "failed to decode work: " <> sshow e

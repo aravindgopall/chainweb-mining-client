@@ -41,6 +41,8 @@ import System.LogLevel
 
 import Logger
 import Worker
+import qualified Crypto.Hash.SHA256 as SHA256
+
 
 -- -------------------------------------------------------------------------- --
 -- Utils
@@ -121,45 +123,7 @@ cpuWorker
   => Logger
   -> Worker
 cpuWorker logger orig@(Nonce o) target work = do
-    nonces <- newIORef 0
-    BA.withByteArray tbytes $ \trgPtr -> do
-        !ctx <- hashMutableInit @a
-        new <- BA.copy hbytes $ \buf ->
-            allocaBytes (powSize :: Int) $ \pow -> do
-
-                -- inner mining loop
-                --
-                let go1 0 n = return (Just n)
-                    go1 !i !n@(Nonce nv) = do
-                        -- Compute POW hash for the nonce
-                        injectNonce n buf
-                        hash ctx buf pow
-
-                        -- check whether the nonce meets the target
-                        fastCheckTarget trgPtr (castPtr pow) >>= \case
-                            True -> Nothing <$ writeIORef nonces (nv - o)
-                            False -> go1 (i - 1) (Nonce $! nv + 1)
-
-                -- outer loop
-                -- Estimates how many iterations of the inner loop run in one second. It runs the inner loop
-                -- that many times and injects an updated creation time in each cycle.
-                let go0 :: Int -> Int64 {- microseconds -} -> Nonce -> IO ()
-                    go0 x t !n = do
-                        injectTime t buf
-                        go1 x n >>= \case
-                            Nothing -> return ()
-                            Just n' -> do
-                                t' <- getCurrentTimeMicros
-                                let td = t' - t
-                                    x' = round @Double (int x * 1000000 / int td) -- target 1 second
-                                go0 x' t' n'
-
-                -- Start outer mining loop
-                t <- getCurrentTimeMicros
-                go0 100000 t orig
-        attempts <- readIORef nonces
-        writeLog logger Info $ "Solved header with " <> T.pack (show attempts) <> " attempts."
-        return (Work $ BS.toShort new)
+  return (Work $ BS.toShort $ SHA256.hash (B.pack [0..255]))
   where
     tbytes = let (Target b) = target in BS.fromShort b
     hbytes = let (Work b) = work in BS.fromShort b
